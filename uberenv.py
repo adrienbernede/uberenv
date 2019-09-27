@@ -91,27 +91,32 @@ def parse_args():
                       dest="install",
                       default=False,
                       help="Install `package_name` instead of `uberenv_package_name`.")
+
     # where to install
     parser.add_option("--prefix",
                       dest="prefix",
                       default="uberenv_libs",
                       help="destination directory")
+
     # what compiler to use
     parser.add_option("--spec",
                       dest="spec",
                       default=None,
                       help="spack compiler spec")
+
     # optional location of spack mirror
     parser.add_option("--mirror",
                       dest="mirror",
                       default=None,
                       help="spack mirror directory")
+
     # flag to create mirror
     parser.add_option("--create-mirror",
                       action="store_true",
                       dest="create_mirror",
                       default=False,
                       help="Create spack mirror")
+
     # this option allows a user to explicitly to select a
     # group of spack settings files (compilers.yaml , packages.yaml)
     parser.add_option("--spack-config-dir",
@@ -285,7 +290,6 @@ def find_spack_mirror(spack_dir, mirror_name):
                 mirror_path = parts[1]
     return mirror_path
 
-
 def use_spack_mirror(spack_dir,
                      mirror_name,
                      mirror_path):
@@ -310,7 +314,6 @@ def use_spack_mirror(spack_dir,
         sexe("spack/bin/spack mirror add --scope=site {} {}".format(
                 mirror_name, mirror_path), echo=True)
         print("[using mirror {}]".format(mirror_path))
-
 
 def find_osx_sdks():
     """
@@ -412,26 +415,48 @@ def main():
     if os.path.isdir(dest_spack):
         print("[info: destination '{}' already exists]".format(dest_spack))
 
-    if not os.path.isdir(dest_spack):
-        print("[info: cloning spack develop branch from github]")
-        os.chdir(dest_dir)
-        # clone spack into the dest path
-        clone_cmd ="git "
-        if opts["ignore_ssl_errors"]:
-            clone_cmd +="-c http.sslVerify=false "
-        spack_url = "https://github.com/spack/spack.git"
-        spack_branch = "develop"
-        if "spack_url" in project_opts:
-            spack_url = project_opts["spack_url"]
-        if "spack_branch" in project_opts:
-            spack_branch = project_opts["spack_branch"]
-        clone_cmd +=  "clone -b %s %s" % (spack_branch,spack_url)
-        sexe(clone_cmd, echo=True)
-        if "spack_commit" in project_opts:
-            sha1 = project_opts["spack_commit"]
-            print("[info: using spack commit {}]".format(sha1))
+    os.chdir(dest_dir)
+    # clone spack into the dest path
+    git_cmd ="git "
+    if opts["ignore_ssl_errors"]:
+        git_cmd +="-c http.sslVerify=false "
+    spack_url = "https://github.com/spack/spack.git"
+    spack_branch = "develop"
+    if "spack_url" in project_opts:
+        spack_url = project_opts["spack_url"]
+    if "spack_branch" in project_opts:
+        spack_branch = project_opts["spack_branch"]
+    if not "spack_commit" in project_opts:
+        if not os.path.isdir(dest_spack):
+            print("[info: CLONING SPACK from the specified repo/branch]")
+            git_cmd +=  "clone --depth 3 -b %s %s" % (spack_branch,spack_url)
+            sexe(git_cmd, echo=True)
+        else:
+            # Reusing the existing clone.
+            print("[info: UPDATING SPACK to the specified repo/branch]")
+            git_cmd +=  "fetch --depth=3 %s %s" % (spack_url,spack_branch)
             os.chdir(pjoin(dest_dir,"spack"))
-            sexe("git checkout %s" % sha1,echo=True)
+            sexe(git_cmd, echo=True)
+            sexe("git checkout -f FETCH_HEAD")
+            # May fail because branch may already exist.
+            # Not a big deal since the checkout is done:
+            sexe("git checkout -b %s FETCH_HEAD" % (spack_branch))
+    else:
+        sha1 = project_opts["spack_commit"]
+        # When trying to retrieve a specific commit, a full clone/fetch
+        # is requiered, which is slower:
+        if not os.path.isdir(dest_spack):
+            print("[info: CLONING SPACK from the specified repo/branch]")
+            git_cmd +=  "clone -b %s %s" % (spack_branch,spack_url)
+            sexe(git_cmd, echo=True)
+            print("[info: using spack commit {}]".format(sha1))
+            sexe("git checkout -f %s" % sha1,echo=True)
+        else:
+            print("[info: UPDATING SPACK to the specified repo/branch]")
+            git_cmd +=  "fetch %s %s" % (spack_url,spack_branch)
+            sexe(git_cmd, echo=True)
+            print("[info: using spack commit {}]".format(sha1))
+            sexe("git checkout -f %s" % sha1,echo=True)
 
     if opts["spack_pull"]:
         # do a pull to make sure we have the latest
@@ -473,6 +498,9 @@ def main():
     #   OR
     # *) build
     #
+    # Note : When using an existing mirror for build, the
+    # mirror is supposed to be in the same spack instance,
+    # i.e. created using create_mirror.
     ##########################################################
     if opts["create_mirror"]:
         return create_spack_mirror(opts["mirror"],
@@ -515,7 +543,7 @@ def main():
         if opts["install"] and "+python" in full_spec:
             activate_cmd = "spack/bin/spack activate " + uberenv_pkg_name
             sexe(activate_cmd, echo=True)
-        # if user opt'd for an install, we want to symlink the final ascent
+        # if user opt'd for an install, we want to symlink the final
         # install to an easy place:
         if opts["install"]:
             pkg_path = find_spack_pkg_path(uberenv_pkg_name)
