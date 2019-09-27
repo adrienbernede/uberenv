@@ -110,6 +110,12 @@ def parse_args():
                       default=None,
                       help="spack mirror directory")
 
+    # optional location of spack upstream
+    parser.add_option("--upstream",
+                      dest="upstream",
+                      default=None,
+                      help="spack mirror directory")
+
     # flag to create mirror
     parser.add_option("--create-mirror",
                       action="store_true",
@@ -314,6 +320,42 @@ def use_spack_mirror(spack_dir,
         sexe("spack/bin/spack mirror add --scope=site {} {}".format(
                 mirror_name, mirror_path), echo=True)
         print("[using mirror {}]".format(mirror_path))
+
+def find_spack_upstream(spack_dir, upstream_name):
+    """
+    Returns the path of a site scoped spack upstream with the
+    given name, or None if no upstream exists.
+    """
+    rv, res = sexe('spack/bin/spack config get upstreams', ret_output=True)
+    res = res.replace(' ', '')
+    res = res.replace('install_tree:', '')
+    res = res.replace(':', '')
+    res = res.splitlines()
+    res = res[1:]
+    upstreams = dict(zip(res[::2], res[1::2]))
+
+    upstream_path = None
+    for name in upstreams.keys():
+        if name == upstream_name:
+            upstream_path = upstreams[name]
+    return upstream_path
+
+def use_spack_upstream(spack_dir,
+                     upstream_name,
+                     upstream_path):
+    """
+    Configures spack to use upstream at a given path.
+    """
+    upstream_path = os.path.abspath(upstream_path)
+    existing_upstream_path = os.path.abspath(find_spack_upstream(spack_dir, upstream_name))
+    if ( not existing_upstream_path ) or ( upstream_path != existing_upstream_path ) :
+        # Existing upstream has different URL, error out
+        print("[removing existing spack upstream configuration file]")
+        sexe("rm spack/etc/upstreams.yaml")
+        with open('spack/etc/upstreams.yaml',w) as upstreams_cfg_file
+            upstreams_cfg="upstreams:"
+            upstreams_cfg+="    {}:".format(upstream_name)
+            upstreams_cfg+="        install_tree: {}".format(upstream_path)
 
 def find_osx_sdks():
     """
