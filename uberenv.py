@@ -62,6 +62,7 @@ import datetime
 import glob
 
 from optparse import OptionParser
+from datetime import datetime
 
 from os import environ as env
 from os.path import join as pjoin
@@ -436,7 +437,7 @@ def main():
     if opts["install"]:
         install_arg = "install "
     else:
-        install_arg = "dev-build -d {} -u hostconfig ".format(base_dir)
+        install_arg = "dev-build -d {} -u configure ".format(base_dir)
 
     print("[uberenv project settings: {}]".format(str(project_opts)))
     print("[uberenv options: {}]".format(str(opts)))
@@ -571,6 +572,28 @@ def main():
             use_spack_upstream(dest_spack,
                                uberenv_pkg_name,
                                opts["upstream"])
+
+        now = datetime.now()
+        date = "{}-{}-{}".format(now.year, now.month, now.day)
+        time = "{}-{}-{}".format(now.hour, now.minute, now.second)
+        if opts["install"]:
+            spack_env_name = "install_{}_{}".format(date,time)
+        else:
+            spack_env_name = "deps_{}_{}".format(date,time)
+
+        env_cmd = "spack -d env create --without-view {}".format(spack_env_name)
+        res = sexe(env_cmd, echo=True)
+
+        if res != 0:
+            print("Error while creating spack environment")
+            return res
+
+        activate_cmd = "spack -d env activate {}".format(spack_env_name)
+        res = sexe(activate_cmd, echo=True)
+
+        if res != 0:
+            print("Error while activating spack environment")
+            return res
 
         install_cmd = "spack/bin/spack "
         if opts["ignore_ssl_errors"]:
