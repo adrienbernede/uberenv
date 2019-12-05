@@ -356,10 +356,7 @@ def setup_osx_sdk_env_vars():
 def find_spack_pkg_path(pkg_name):
     r,rout = sexe("spack/bin/spack find -p " + pkg_name,ret_output = True)
     for l in rout.split("\n"):
-        lstrip = l.strip()
-        if not lstrip == "" and \
-           not lstrip.startswith("==>") and  \
-           not lstrip.startswith("--"):
+        if l.startswith(pkg_name):
             return {"name": pkg_name, "path": l.split()[-1]}
     print("[ERROR: failed to find package named '{}']".format(pkg_name))
     sys.exit(-1)
