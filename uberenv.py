@@ -207,11 +207,26 @@ class UberEnv():
         print("[uberenv project settings: {}]".format(str(self.project_opts)))
         print("[uberenv options: {}]".format(str(self.opts)))
 
-        # setup main package name
-        if opts["install"]:
-            self.pkg_name = self.project_opts["package_name"]
+        # All possible cases to maintain support for fake-package
+        if self.project_opts["uberenv_package_name"] ||
+           (self.project_opts["package_name"] != self.project_opts["uberenv_package_name"]):
+            if not opts["install"]:
+                self.mode = "fake_package"
+                self.pkg_name = self.project_opts["uberenv_package_name"]
+            else:
+                self.mode = "install"
+                self.pkg_name = self.project_opts["package_name"]
         else:
-            self.pkg_name = self.project_opts["uberenv_package_name"]
+            self.pkg_name = self.project_opts["package_name"]
+            if not opts["install"]:
+                if not self.project_opts["package_version"]:
+                    print("[ERROR: package_version must be defined in project.json ]")
+                    sys.exit(-1)
+                else
+                    self.mode = "dev-build"
+                    self.pkg_version = self.project_opts["package_version"]
+            else:
+                self.mode = "install"
 
     def setup_paths_and_dirs(self):
         self.uberenv_path = os.path.split(os.path.abspath(__file__))[0]
@@ -248,6 +263,10 @@ class SpackEnv(UberEnv):
                 opts["spec"] = "%clang"
             else:
                 opts["spec"] = "%gcc"
+
+        if self.mode is "dev-build":
+            opts["spec"] = "@{}{}".format(self.pkg_version,opts["spec"])
+
         print("[spack spec: {}]".format(opts["spec"]))
 
     def setup_paths_and_dirs(self):
@@ -297,7 +316,7 @@ class SpackEnv(UberEnv):
 
             os.chdir(self.dest_dir)
 
-            clone_opts = ("-c http.sslVerify=false " 
+            clone_opts = ("-c http.sslVerify=false "
                           if self.opts["ignore_ssl_errors"] else "")
 
             spack_branch = self.project_opts.get("spack_branch", "develop")
