@@ -1,4 +1,7 @@
 trigger-conduit:
   variables:
     UPDATE_UBERENV: $CI_COMMIT_REF_NAME
-  trigger: radiuss/conduit
+  trigger:
+    project: radiuss/conduit
+    branch: feature/uberenv_ci
+    strategy: depend
