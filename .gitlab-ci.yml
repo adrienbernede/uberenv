@@ -1,0 +1,4 @@
+trigger-conduit:
+  variables:
+    UPDATE_UBERENV: $CI_COMMIT_REF_NAME
+  trigger: radiuss/conduit
